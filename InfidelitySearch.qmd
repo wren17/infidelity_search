@@ -1,0 +1,199 @@
+---
+title: "A Dynamic Search Model for Marriage and Infidelity"
+author: Wuyang Ren
+date: last-modified
+bibliography: 622.bib
+execute:
+  eval: true
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    html-math-method: mathjax
+    self-contained: true
+    embed-resources: true
+engine: julia
+---
+
+```{julia}
+import Pkg
+Pkg.activate(".")
+include("src/MarriageModel.jl")
+using .MarriageModel
+```
+
+```{julia}
+p = ModelParams()
+println(p)
+@doc ModelParams
+```
+
+```{julia}
+using Plots
+p = ModelParams()
+τ_range = 0:1:p.T
+
+g_lin = LinearGamma()
+g_con = ConcaveGamma()
+
+x0 = 1.0
+
+u_lin = [x0 + gamma_val(g_lin, τ) for τ in τ_range]
+u_con = [x0 + gamma_val(g_con, τ) for τ in τ_range]
+
+plot(τ_range, u_lin,
+     label = "Linear: x + γτ",
+     lw = 2, color = :blue)
+plot!(τ_range, u_con,
+      label = "Concave: x + γ_max ρτ/(1+ρτ)",
+      lw = 2, color = :green)
+hline!([x0], label = "Initial quality x = $x0", ls = :dot, color = :gray)
+vline!([p.T], label = "Terminal Period T = $(p.T)", ls = :dash, color = :red)
+xlabel!("Marriage Time")
+ylabel!("Marriage Flow Utility")
+title!("Match Value Growth Paths")
+
+```
+
+## The Cheating Game
+
+### Payoffs
+
+#### Variable Definitions
+
+| Variable | Definition |
+|:--------------------------------|:--------------------------------------|
+| $u(\tau, x)$ | Flow utility of a marriage with initial quality $x$ at time $\tau$: $u(\tau,x) = x + \gamma(\tau)$ |
+| $W(\tau, x)$ | Discounted continuation value of staying married: $W = \beta\bigl[(1-\lambda)\,V_M(\tau+1,x) + \lambda\,V_S\bigr]$ |
+| $V_M(\tau, x)$ | Value of being in a marriage of quality draw$x$ at time $\tau$ |
+| $V_S$ | Value of single |
+| $x_C$ | Cheater's reservation quality: $\beta V_M(0, x_C) - \delta_C = W(\tau, x_C)$ |
+| $p_c$ | Probability cheater finds an acceptable outside match: $p_c = \alpha'[1 - F(x_C)]$ |
+| $\mathbb{1}_{fd}$ | Indicator for faithful partner initiating divorce: $\mathbb{1}(\beta V_S - \delta_F \geq W)$ |
+
+In each period, the couple plays the $2 \times 2$ cheating game with actions $\{Cheat (C), Faithful (F)\}$ \$\$
+
+$$
+\begin{array}{c\|cc}
+& F & C \\\\ \
+F & V^{FF} & V^{FC} \\\\
+C & V^{CF} & V^{CC}
+\end{array}
+$$
+
+[`payoffs.jl`](src/payoffs.jl) defines the payoffs for each action profile as follows: 1. Both faithful (F, F)\
+$$
+V^{FF}(\tau,x) = u(\tau,x) + W(\tau,x)
+$$
+
+2.  One cheats (F, C)/(C, F)
+
+    Cheater's payoff:
+
+    $$
+    \begin{align}
+    V_1^{CF}(\tau, x) &= u(\tau, x) - c
+        + \underbrace{\alpha' \left[ \beta \int_{x_c}^{\bar{x}} V_M(0, x')\, \mathrm{d}F(x')
+        - \delta_C \bigl(1 - F(x_c)\bigr) \right]}_{\text{expected gain from leaving}} \\
+        &+ (1 - \alpha' \left(1 - F\!\left(x_c\right)\right) \left[
+            \mathbb{1}_{fd} \bigl(-\delta_C + \beta V_S\bigr)
+            + (1 - \mathbb{1}_{fd})\, W(\tau, x)
+        \right]
+    \end{align}
+    $$
+
+    Faithful partner's payoff:
+
+    $$
+    \begin{align}
+    V_2^{CF}(\tau, x) &= u(\tau, x) - \kappa 
+        + \max\Bigl\{ 
+            \underbrace{-\delta_F + \beta V_S}_{\text{leave}},\; 
+            \underbrace{p_c(-\delta_F + \beta V_S) + (1 - p_c)\,W(\tau, x)}_{\text{stay}} 
+        \Bigr\}
+    \end{align}
+    $$
+
+3.  Both cheats (C, C)
+
+    $$
+    \begin{align}V^{CC}(\tau, x) &= u(\tau, x) - c    + \alpha \left[\beta \int_{x_c}^{\bar{x}} V_M(0, x')\,\mathrm{d}F(x')        - \delta_C\bigl(1 - F(x_c)\bigr)    \right] \\
+        &\quad + (1 - p_c)\Bigl[        p_c\bigl(-\delta_C + \beta V_S\bigr)        + (1 - p_c)\,W(\tau, x)    \Bigr]\end{align}
+    $$
+
+The cheater's reservation $x'$ draw for leaving the current relationship is $\beta V_M(0, x_C) - \delta_C = W(\tau, x_C)$.
+
+Given that $V_M(0, x_C)$ is monotinic in $x$, `find_x_cut` in [`functions.jl`](src/functions.jl) solves for $x_C$ using linear interpolation over the grid of $x$ values and their corresponding $V_M(0, x)$. The function checks the boundary conditions to determine if the cheater always stays or always leaves. Otherwise it finds the cutoff $x_C$ where the cheater is indifferent between staying and leaving.
+
+### Solving for the Equilibrium
+
+The game can be thought of as a symmetric coordination game. The equilibrium analysis reduces to checking two deviation incentives:
+
+1.  $\Delta_F(\tau, x) = V_1^{CF} - V^{FF}$: The gain for a faithful partner from deviating to cheating when the partner remains faithful.
+2.  $\Delta_C(\tau, x) = V^{CC} - V_2^{CF}$: The gain for a faith partner from deviating to cheating when the partner also cheats.
+
+Given this, the pure-strategy equilibria of the game can be characterized as three regions.
+
+1.  $\Delta_F(\tau, x) < 0$ and $\Delta_C(\tau, x) < 0$: both partners choose Faithful (F, F).
+
+2.  $\Delta_F(\tau, x) < 0$ and $\Delta_C(\tau, x) \geq 0$: multiple equilibria (F, F) and (C, C). Cheating does not make the player better off when the partner is faithful, but it does when the partner also cheats.
+
+3.  $\Delta_F(\tau, x) \geq 0$: both partners choose Cheat (C, C).
+
+When multiplicity arises, we select the outcome that gives the players higher payoffs.
+
+In region 2, there exists a mixed strategy equilibrium where each player cheats with probability $s^* \in (0, 1)$. The equilibrium cheating probability $s^*$ is the solution to the following equation:
+
+The following code demonstrates the Nash equilibrium computation using [nash_equilibrium()](src/nash.jl) with a single state example.
+
+```{julia}
+xg = x_grid(p)
+VS = p.b / (1.0 - p.β) # a permanent bachelor 
+VM0_vals = [match_value(0, x, p) / (1.0 - p.β) for x in xg] 
+
+τ = 5
+x = 1.0
+W = W_cont(match_value(τ + 1, x, p) / (1.0 - p.β), VS, p)
+
+eq_type, s_star, V_eq = nash_equilibrium(τ, x, W, VM0_vals, xg, VS, p)
+
+println("Equilibrium type:", eq_type)
+println("Cheating prob s* = ", s_star)
+println("Equilirbim payoff = ", V_eq)
+```
+
+## Backward Induction
+
+For durations $\tau \geq T$, match quality has stopped evolving, so the marriage problem becomes stationary: the continuation value value of marriage is the same in every period.
+
+The solution algorithm starts with guessing that $T$ is large enough to make cheating unattractive, and so agents remain faithful for every period $\tau \geq T$. From this, the value of marriage in period $T$ is: $$
+V_M^\infty(x) = u(T, x) + \beta \big[(1 -\lambda) V_M^\infty(x) +\lambda V_S \big]
+$$
+
+Solving for $V_M^\infty$: $$
+\begin{align}
+V_M^\infty(x) = V(T, x)= \frac{u(T, x) + \beta\lambda V_S}{1 - \beta (1 -\lambda)}
+\end{align}
+$$
+
+Given the initial guess of $V(T, x)$, `solve_terminal()` in [`backward_induction.jl`](src/backward_induction.jl) computes the continuation value $W(T, x)$ and use `nash_equilibrium()` to solve for the equilibrium payoffs in the terminal period, which gives an updated $V(T, x)$. The process iterates until convergence.
+
+`backward_induction()` then uses the `VM_T` from the terminal period to solve the cheating game in every state $(\tau, x)$ where $\tau < T$.
+
+```{julia}
+VM_T, _, _ = solve_terminal(VM0_vals, xg, VS, p)
+
+V_FF_guess = [(match_value(p.T, x, p) + p.β * p.λ * VS) / (1.0 - p.β * (1.0 - p.λ)) for x in xg]
+
+println("Converged equilibrium payoffs", first(VM_T, 5))
+println("Initial guesses: ", first(V_FF_guess, 5))
+
+VM, eq_type_grid, s_star_grid = backward_induction(VM0_vals, xg, VS, p) #returns matrices of size τ * x 
+
+```
+
+## Solving for $V_S$
+
+## Complete Solution
+
+## Comparitive Statics
