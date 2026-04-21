@@ -68,18 +68,21 @@ end
 Find the reservation match quality x* where V_M(0, x*) = VS.
 """
 function find_x_star(VM0_vals, VS, xg, param)
-    itp = linear_interpolation(xg, VM0_vals, extrapolation_bc=Flat())
-    if itp(param.x_lo) >= VS
+    target = VS
+
+    if target <= VM0_vals[1]
         return param.x_lo
-    elseif itp(param.x_hi) <= VS
+    elseif target >= VM0_vals[end]
         return param.x_hi
     end
+
     for i in 1:(length(xg) - 1)
-        if itp(xg[i]) <= VS && itp(xg[i + 1]) >= VS
-            frac = (VS - itp(xg[i])) / (itp(xg[i + 1]) - itp(xg[i]))
+        if VM0_vals[i] <= target && VM0_vals[i + 1] >= target
+            frac = (target - VM0_vals[i]) / (VM0_vals[i + 1] - VM0_vals[i])
             return xg[i] + frac * (xg[i + 1] - xg[i])
         end
     end
+
     return param.x_hi
 end
 

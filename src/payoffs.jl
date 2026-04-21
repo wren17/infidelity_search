@@ -52,13 +52,11 @@ function payoff_CC(τ, x, W, VM0_vals, xg, VS, param)
     pc    = compute_pc(x_cut, param)
 
     integral_above = integral_VM0_above(x_cut, VM0_vals, xg, param)
-    prob_above = 1.0 - F_cdf(x_cut, param)
-    E_VM0_cond = prob_above > 1e-12 ? integral_above / prob_above : 0.0
+    cheater_leave_gain = param.α_prime * (param.β * integral_above - param.δ_C * (1.0 - F_cdf(x_cut, param)))
 
-    V_CC = u - param.c +
-           pc * (-param.δ_C + param.β * E_VM0_cond) +
-           (1.0 - pc) * pc * (-param.δ_C + param.β * VS) +
-           (1.0 - pc)^2 * W
+    V_CC = u - param.c + cheater_leave_gain +
+           (1.0 - pc) * (pc * (-param.δ_C + param.β * VS) +
+                         (1.0 - pc) * W)
 
     return V_CC
 end

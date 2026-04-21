@@ -50,7 +50,7 @@ All parameters of the marriage/infidelity model.
 @with_kw struct ModelParams
     β::Float64    = 0.95     
     α::Float64    = 0.30    
-    α_prime::Float64 = 0.30  
+    α_prime::Float64 = 0.15  
 
     #Singles flow payoff
     b::Float64    = 0.50
