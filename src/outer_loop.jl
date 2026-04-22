@@ -1,6 +1,7 @@
 
 """
 Update V_S using the Bellman equation
+compute_VS(VM0_vals, xg, VS_old, param)
 """
 function compute_VS(VM0_vals, xg, VS_old, param)
 
@@ -20,6 +21,8 @@ end
 """
 Outer fixed-point iteration over V_S,
 with inner backward induction at each step.
+
+solve_model(parameters)
 """
 function solve_model(param)
 
@@ -54,7 +57,7 @@ function solve_model(param)
             VS = new_VS
             VM0_vals = new_VM0_vals
             if iter > 1
-                println("Converged in $iter outer iterations.")
+                println("Converged in $iter iterations.")
             end
             break
         end
@@ -65,7 +68,7 @@ function solve_model(param)
     end
 
     if !converged
-        @warn "Outer fixed point did not converge after $(param.max_iter) iterations."
+        @warn "Did not converge after $(param.max_iter) iterations."
     end
 
     # Reservation quality

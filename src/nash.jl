@@ -5,6 +5,7 @@ Returns:
   - eq_type: :FF, :CC, :mixed, or :multiple
   - s_star:  equilibrium cheating probability (0 for FF, 1 for CC, interior for mixed)
   - V_eq:    equilibrium value for each agent
+nash_equilibrium(τ, x, W, VM0_vals, xg, VS, param)  
 """
 function nash_equilibrium(τ, x, W, VM0_vals, xg, VS, param)
 
@@ -42,7 +43,7 @@ function nash_equilibrium(τ, x, W, VM0_vals, xg, VS, param)
     num   = V1_CF - V_FF
     denom = (V1_CF - V_FF) - (V_CC - V_FC)
 
-    if abs(denom) < 1e-6
+    if isapprox(denom, 0.0; atol=1e-6)
         # Degenerate default to FF
         return (:FF, 0.0, V_FF)
     end
