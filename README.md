@@ -21,7 +21,7 @@ A continuum of agents are either single or married. Single agents receive flow p
 
 ## Quick Start
 
-[`InfidelitySearch.qmd`](InfidelitySearch.qmd) provides a more detailed summary of the model and goes through each step of the solution algorithm. If you just want to see the outputs without running anything, an HTML version ([`InfidelitySearch.html`](InfidelitySearch.html)) with the results is also included.
+[`InfidelitySearch.qmd`](InfidelitySearch.qmd) provides a detailed summary of the model and goes through each step of the solution algorithm. If you just want to see the outputs without running anything, an HTML version ([`InfidelitySearch.html`](InfidelitySearch.html)) with the results is also included.
 
 Or, if you'd just like to see some of the model solution, it is also easy to get the results by running the individual components:
 
