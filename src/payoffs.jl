@@ -1,5 +1,6 @@
 """
 Payoffs of both players faithful
+payoff_FF(τ, x, W, param)
 """
 function payoff_FF(τ, x, W, param)
     return match_value(τ, x, param) + W
@@ -9,6 +10,7 @@ end
 (C, F)
 V1_CF (cheater)
 V2_CF (faithful)
+payoff_CF(τ, x, W, VM0_vals, x_grid, VS, param)
 """
 function payoff_CF(τ, x, W, VM0_vals, xg, VS, param)
 
@@ -43,6 +45,7 @@ end
 
 """
 Payoffs of both players cheating
+payoff_CC(τ, x, W, VM0_vals, x_grid, VS, param)
 """
 function payoff_CC(τ, x, W, VM0_vals, xg, VS, param)
 
