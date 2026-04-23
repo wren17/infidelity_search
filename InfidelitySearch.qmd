@@ -2,7 +2,8 @@
 title: "A Dynamic Search Model for Marriage and Infidelity"
 author: Wuyang Ren
 date: last-modified
-bibliography: 622.bib
+bibliography: "622.bib"
+link-citations: true
 execute:
   eval: true
 format:
@@ -15,11 +16,26 @@ format:
 engine: julia
 ---
 
+# Introduction
+
+In @burdett_unstable_2002's study of endogenous instability in bilateral relationships in a continuous-time setting, an agent who searches while already matched does not observe the quality of a prospective new match until they leave their current partner. This makes the cheating decision fundamentally static: agents choose whether to search outside the relationship at the moment the match is formed, and the equilibrium outcome is characterized by regions of the match values. 
+
+This project extends @burdett_unstable_2002 into a finite-horizon, discrete-time framework. The finite horizon and discrete time structure allow the problem to be solved with backward induction, making the cheating decision dynamic. Within each period, the two partners play a simultaneous $2 \times 2$ stage game: Faithful or Cheat, and the resulting Nash equilibrium determines transition probabilities into divorce, continued marriage, or a new match.
+
+Another extension is the introduction of match-specific flow utility that grows with marriage duration and is non-transferable across relationships. While married, the flow utility of a match of quality $x$ at tenure $\tau$ is $x + \gamma(\tau)$, where $\gamma(\tau)$ captures relationship-specific investments: shared routines, social networks, joint property, and attachment. These factors are largely non-transferable to a new partner. The baseline specification follows a linear growth pattern. Drawing on @jovanovic_job_1979, I also consider a concave specification $\gamma(\tau) = \gamma_{\max}(\frac{\rho\tau}{1 + \rho\tau})$, where the marginal return to marriage duration diminishes over time and saturates at $\gamma_{\max}$. The interpretation here is different from @jovanovic_job_1979 's job-matching model, where tenure generates match-specific value through Bayesian updating. Here, the rationale for the concave setup is simply that the marriage-specific capital might grow faster in earlier years of the marriage in reality. Having the growth rate approaching $\gamma_{\max}$ not computational (since the growth stops in $T$ anyways). It is mainly to give more comparative statics to explore. In any case, the frameworks should predict declining separation rates in tenure.
+
+The model also introduces asymmetric divorce costs: the partner who is caught cheating bears a higher cost $\delta_C$ than the faithful partner $\delta_F$. This asymmetry reflects legal and social penalties for infidelity disciplines cheating incentives.
+
+The equilibrium is characterized by the value of being single $V_S$, the strategy profile in each marriage state $s^*(\tau, x)$, and the value of being married at quality $x$ and tenure $\tau$, $V_M(\tau, x)$. From the equilibrium, I obtain the steady-state distribution of marriages and the singles pool, as well as infidelity and divorce rates. Finally, I conduct comparative statics on key parameters.
+# Implementation
+
 ```{julia}
 import Pkg
 Pkg.activate(".")
-include("src/MarriageModel.jl")
-using .MarriageModel
+using MarriageModel
+using Random
+using Distributions
+using Printf 
 ```
 
 ```{julia}
@@ -125,6 +141,10 @@ The cheater's reservation $x'$ draw for leaving the current relationship is $\be
 
 Given that $V_M(0, x_C)$ is monotinic in $x$, `find_x_cut` in [`functions.jl`](src/functions.jl) solves for $x_C$ using linear interpolation over the grid of $x$ values and their corresponding $V_M(0, x)$. The function checks the boundary conditions to determine if the cheater always stays or always leaves. Otherwise it finds the cutoff $x_C$ where the cheater is indifferent between staying and leaving.
 
+The integral $\int_{x_c}^{\bar{x}} V_M(0, x')\,\mathrm{d}F(x')$ is evaluated numerically in `integral_VM0_above` ([`functions.jl`](src/functions.jl)) in two steps. First, since $V_M(0, \cdot)$ is only known at the discrete grid points in `xg`, it is extended to a continuous function via `linear_interpolation` from `Interpolations.jl`. Second, because $F$ is unifim, the integrand reduces to $V_M(0, x') \cdot f$ with constant density, and the integral is then computed with adaptive Gauss–Kronrod quadrature using `quadgk` from `QuadGK.jl`.
+
+The same interpolate-then-`quadgk` process is used in `compute_VS` ([`outer_loop.jl`](src/outer_loop.jl)) to evaluate the expected continuation value over outside draws above the reservation quality $x^*$.
+
 ### Solving for the Equilibrium
 
 The game can be thought of as a symmetric coordination game. The equilibrium analysis reduces to checking two deviation incentives:
@@ -192,8 +212,225 @@ VM, eq_type_grid, s_star_grid = backward_induction(VM0_vals, xg, VS, p) #returns
 
 ```
 
-## Solving for $V_S$
+## Fixed-Point Solution for $V_S$
 
-## Complete Solution
+We start with an intial guess for the value of being single $V^0_S = b/(1-\beta)$, which gives the lower bound, as it reflects the case of one being single forever. Similarlu, we initialize the value of marriage at the start of the relationship as $V^0_M(0, x) = u(0,x) / (1 - \beta)$ for each $x$ on the grid, with no flow utility growth, search, or dissolution.
+
+At each iteration $n$ , taking V\^n_S and V\^n_M(0, x) as given, we solve for the equilibrium payoffs in the cheating game using the backward induction algorithm descried above. The solution gives the value of marriage and equilibrium action profiles for each state, yielding an updated marriage values $V^{n+1}_M(0, x)$ at the start of the relationship.
+
+Using $V^{n+1}_M(0, x)$, we can then find the reservation quality $x^*$ of a single person satisfying $V^{n+1}_M(0, x) = V^n_S$. Following this, we update $V^n_S \rightarrow V^{n+1}_S$ with the recursive bellman equation:
+
+$$
+V^{n+1}_S = b + \beta \left[ V^{n}_S + \alpha \int_{x^*}^{x^{max}} \big( V_M^{n+1}(0, x) - V_S^{n} \big)\, dF(x) \right] 
+$$
+
+```{julia}
+sol_lin = solve_model(p)
+
+println("V_S = ", sol_lin.VS)
+println("x* = ", sol_lin.x_star)
+println("V_M(0, x_lo)= ", sol_lin.VM[1, 1])
+println("V_M(0, x_hi)= ", sol_lin.VM[1, end])
+
+p_conc = ModelParams(p; gamma_spec=ConcaveGamma())
+sol_conc = solve_model(p_conc)
+
+println("V_S = ", sol_conc.VS)
+println("x* = ", sol_conc.x_star)
+println("V_M(0, x_lo)= ", sol_conc.VM[1, 1])
+println("V_M(0, x_hi)= ", sol_conc.VM[1, end])
+```
+
+### Plots
+
+```{julia}
+colors = [:blue, :green, :orange, :red]
+Nx     = length(sol_lin.xg)
+x_idxs = [1, div(Nx, 3), 2 * div(Nx, 3), Nx]
+
+plt_lin = plot(title="Linear γ: V_M vs τ", xlabel="τ", ylabel="V_M(τ, x)",
+               legend=:bottomright, titlefontsize=10)
+for (i, col) in zip(x_idxs, colors)
+    plot!(plt_lin, 0:p.T, sol_lin.VM[:, i], color=col,
+          label="x=$(round(sol_lin.xg[i], digits=2))", lw=2)
+end
+hline!(plt_lin, [sol_lin.VS], color=:black, ls=:dash, label="V_S", lw=1.5)
+
+plt_conc = plot(title="Concave γ: V_M vs τ", xlabel="τ", ylabel="V_M(τ, x)",
+                legend=:bottomright, titlefontsize=10)
+for (i, col) in zip(x_idxs, colors)
+    plot!(plt_conc, 0:p_conc.T, sol_conc.VM[:, i], color=col,
+          label="x=$(round(sol_conc.xg[i], digits=2))", lw=2)
+end
+hline!(plt_conc, [sol_conc.VS], color=:black, ls=:dash, label="V_S", lw=1.5)
+
+plot(plt_lin, plt_conc, layout=(1, 2), size=(1000, 400))
+```
+
+```{julia}
+hm_lin = heatmap(sol_lin.xg, 0:p.T, sol_lin.s_star_grid,
+                 title="Linear γ: Cheating Probability s*(τ, x)",
+                 xlabel="x", ylabel="τ",
+                 color=:heat, clims=(0, 1), titlefontsize=10)
+
+hm_conc = heatmap(sol_conc.xg, 0:p_conc.T, sol_conc.s_star_grid,
+                  title="Concave γ: Cheating Probability s*(τ, x)",
+                  xlabel="x", ylabel="τ",
+                  color=:heat, clims=(0, 1), titlefontsize=10)
+
+plot(hm_lin, hm_conc, layout=(1, 2), size=(1000, 400))
+```
+
+Note that interestingly, the mixed strategy region (yellow in the heatmap) is not necessarily monotone in $\tau$. By the time of the project submission, I have not come up with an analytical explanation for this pattern. The intuition is that it has something to do with $\alpha'$. The cheater's $\alpha'$ is lower than $\alpha$, as it represents the probability of encountering someone, and that person is willing to match with you. $\alpha$ just captures the meeting rate. In a more thorough model, $\alpha'$ should be endogenously determined by agents' aggregate cheating decisions, but in both @burdett_unstable_2002 and this project, it is exogenously fixed, so the interpretation of how big $\alpha'$ should be is a bit ambiguous. One possible explanation is that when $\alpha'$ is low, the cheater's outside option is less desirable, and in the region of low $x$, marriage is likely to dissolve from endogenous breakups, so they might be better off from waiting for the relationship to end. (This might not be right; will be updated if I have a better explanation; or maybe something in the code is wrong)
+
+## Steady State Distributions
+
+Given the solution for cheating decisions in each state $s^*(\tau, x)$, the reservation quality $x^*$ for singles, and the reservation quality $x_C$ for cheaters, we can compute the steady-state distribution of marriages by forward recursion on marriage time $\tau$.
+
+Let $n(\tau, x)$ be the measure of marriages (in pairs) with quality $x$ at time $\tau$. New matches form at $\tau = 0$ from two sources of singles meeting at rate $\alpha$ and cheaters leaving their current marriage. So the inflow of relationships is given by:
+
+$$
+n(0, x) = \left[ \alpha \mathbb{1}\{x\geq x^* \}n(\tau, x) n_s + \alpha' \sum_{\tau, x} s^*(\tau, x) \mathbb{1}\{x\geq x_c\}n(\tau, x)\right]f(x)dx
+$$
+
+Let $D_e(s^*())$ denote the endogenous dissolution probability of a marriage, which depends on the equilibrium cheating strategies. Combidng this with the exogenous separation rate of $\lambda$, the probability of a marriage dissolution $D$ is given by
+
+$$
+D(\tau, x)= 1 - (1-\lambda)(1- D_e(s^*))
+$$
+
+where $D_e(s^*)$ is given by the following cases:
+
+-   If $s^*(\tau, x) = 0$ (faithful equilibrium), then $D_e = 0$.
+
+-   If $s^*(\tau, x) = 1$ (cheating equilibrium), then marriage dissolves when at least one cheater finds a person worth leaving for: $D_e = 1.0 - (1.0 - p_c)^2$.
+
+-   If $s^*(\tau, x) \in (0, 1)$, $D_e = 1 -\mathbb{E}[survival | s^*]$, where the expectation averages survival probability across three outcome profiles, (F,F), (C,F), and (C,C), weighted by their likelihoods under $s^*$
+
+From this, $n(\tau, x)$ evolves following:
+
+$$
+n(\tau + 1, x) = (1 - D(\tau, x)) n(\tau, x)
+$$
+
+`divorce_prob()` function from [`steady_state.jl`](src/steady_state.jl) calculates the probability of a marriage dissolution at each state $(\tau, x)$
+
+Using this, we can simulate a cohort through $\tau$ and obtain the steady state distribution of married and single agents, as well as the divorce and infidelity rates. The `steady_state_distribution()` function does this. $x$ is fixed in a relationship, so we begin with an initial cohort and apply time \tau -specific dissolution rates to determine the mass that survives to each subsequent period.
+
+At each state $(\tau, x)$, the measure $n(\tau, x)$ is constant over time only if the inflow of survivors from $(\tau - 1, x)$ equals the outflow of matches that either dissolve or advance to $\tau + 1$. Imposing flow balance at every state simultaneously, the algorithm produces the steady state the distribution.
+
+```{julia}
+τ = 10
+x_i = 2
+
+prob_example = divorce_prob(τ, x_i, sol_lin, p)
+println("the probability of a marriage dissolution in period 10 with a match value of 2 using linear γ is",  prob_example)
+
+ss = steady_state_distribution(sol_lin, p)
+println("Infidelity rate (linear γ):", round(ss.infidelity_rate, digits=2))
+println("Divorce rate:", round(ss.divorce_rate, digits=2))
+println("Avg marriage duration:", round(ss.avg_duration, digits=2))
+
+ss_conc = steady_state_distribution(sol_conc, p_conc)
+println("Infidelity rate (concave γ):", round(ss_conc.infidelity_rate, digits=2))
+println("Divorce rate:", round(ss_conc.divorce_rate, digits=2))
+println("Avg marriage duration:", round(ss_conc.avg_duration, digits=2))
+```
+
+```{julia}
+avg_D_lin  = [mean([divorce_prob(τ, i, sol_lin,  p)      for i in 1:length(xg)]) for τ in 0:p.T]
+avg_D_conc = [mean([divorce_prob(τ, i, sol_conc, p_conc) for i in 1:length(xg)]) for τ in 0:p_conc.T]
+
+plt_diss_lin = plot(0:p.T, avg_D_lin,
+     xlabel="τ", ylabel="P(dissolution)",
+     title="Linear γ",
+     color=:blue, lw=2, legend=false)
+
+plt_diss_conc = plot(0:p_conc.T, avg_D_conc,
+     xlabel="τ", ylabel="P(dissolution)",
+     title="Concave γ",
+     color=:orange, lw=2, legend=false)
+
+plot(plt_diss_lin, plt_diss_conc, layout=(1,2), size=(900, 350))
+```
 
 ## Comparitive Statics
+
+```{julia}
+include("src/comparative_statics.jl")
+```
+
+### Divorce Cost Asymmetry
+
+```{julia}
+results_δ_lin = comparative_statics_δ(p; n_points=5)
+plot_comparative_statics_δ(results_δ_lin)
+```
+
+```{julia}
+results_δ_conc = comparative_statics_δ(p_conc; n_points=5)
+plot_comparative_statics_δ(results_δ_conc)
+```
+
+A higher divorce cost for the cheater relative to the faithful partner deters infidelity, and thus reduces the steady-statedivorce rates.
+
+### Effect of $\rho$ on Outcomes
+
+Changing the linear slope $\gamma$ and the concave curvature $\rho$ (at the default $\gamma_{\max}$) shows how the pace of marriage flow utility accumulation affects infidelity, divorce, and marriage duration.
+
+```{julia}
+results_γ = comparative_statics_γ_all(p; n_points=8)
+plot_comparative_statics_γ(results_γ)
+```
+
+A higher $\gamma$ in the linear case will make the flow utility of marriage grow faster. Since the growth is unbounded untill the terminal period $T$, an increase in $\gamma$ decreases infidelity and divorce rates, and increases the average marriage duration.
+
+In the concave case, an increase in $\rho$ increases infidelity and divorce rates, and decreases the average marriage duration. This is because the default parameter $\gamma_{\max}$ is small, so once the marriage flow utility growth stalls, the continuation value of marriage does not rise much with marriage duration. A higher curvature $\rho$ in the concave case will make the flow utility of marriage grow faster at the beginning, but it will also stall sooner. 
+
+```{julia}
+
+γ_max_hi = 15.0
+res_conc_hi = comparative_statics_γ_concave(p; n_points=8, γ_max=γ_max_hi)
+
+ρ_vals_hi = [r.ρ for r in res_conc_hi]
+
+p_inf = plot(ρ_vals_hi, [r.infidelity_rate for r in res_conc_hi],
+             color=:red, lw=2, marker=:circle, legend=false,
+             title="Infidelity vs ρ (γ_max=$γ_max_hi)", xlabel="ρ", ylabel="Infidelity Rate")
+p_div = plot(ρ_vals_hi, [r.divorce_rate for r in res_conc_hi],
+             color=:blue, lw=2, marker=:circle, legend=false,
+             title="Divorce vs ρ (γ_max=$γ_max_hi)", xlabel="ρ", ylabel="Divorce Rate")
+p_dur = plot(ρ_vals_hi, [r.avg_duration for r in res_conc_hi],
+             color=:green, lw=2, marker=:circle, legend=false,
+             title="Avg Duration vs ρ (γ_max=$γ_max_hi)", xlabel="ρ", ylabel="Duration")
+plot(p_inf, p_div, p_dur, layout=(1, 3), size=(1400, 380))
+
+```
+
+If we give the concave case very higher long-run asymptote $\gamma_{\max}$, then reaching $\gamma_{\max}$ sooner makes remaining in the marriage more attractive. Therefore, in this case, a higher curvature $\rho$ actually reduces infidelity and divorce rates, and increases the average marriage duration.
+
+#### Cheating Heatmaps: Linear $\gamma$
+
+```{julia}
+sols_lin, params_lin, γ_vals = gamma_heatmap_solutions_linear(p)
+plot_gamma_heatmaps_linear(sols_lin, params_lin, γ_vals)
+```
+
+A faster growth rate of marriage flow utility in the linear case reduces the region of cheating equilibria.
+
+#### Cheating Heatmaps: Concave $\gamma$, Varying $\rho$
+
+```{julia}
+sols_conc, params_conc, ρ_vals = gamma_heatmap_solutions_concave(p_conc)
+plot_gamma_heatmaps_concave(sols_conc, params_conc, ρ_vals)
+```
+
+In the concave case with the default $\gamma_{\max}$, a higher curvature $\rho$ increases the region of cheating equilibria when $\gamma_{\max}$ is small. 
+
+#### Changing $\gamma_{\max}$ in the Concave Case
+```{julia}
+sols_conc_gmax, params_conc_gmax, γmax_vals = gamma_heatmap_solutions_concave_γmax(p_conc)
+plot_gamma_heatmaps_concave_γmax(sols_conc_gmax, params_conc_gmax, γmax_vals)
+```
+
+When $\gamma_{\max}$ is very high, a higher curvature $\rho$ reduces the region of cheating equilibria, as it makes the flow utility of marriage grow faster at the beginning, and the long-run asymptote is high enough to make remaining in the marriage more attractive.

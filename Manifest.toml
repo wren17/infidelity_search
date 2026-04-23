@@ -2,7 +2,7 @@
 
 julia_version = "1.12.4"
 manifest_format = "2.0"
-project_hash = "ed7b66be531dd2a5329dba18054e1b1264d81fe4"
+project_hash = "b19fc9e49e98ac1506c19016a1427f4ad94cbe8c"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -553,7 +553,7 @@ uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.28"
 
 [[deps.InfidelitySearch]]
-deps = ["Distributions", "ForwardDiff", "Interpolations", "NLsolve", "Parameters", "Plots", "Printf", "QuadGK", "Roots", "Statistics", "Test"]
+deps = ["Distributions", "ForwardDiff", "Interpolations", "NLsolve", "Parameters", "Plots", "Printf", "QuadGK", "Random", "Roots", "Statistics", "Test"]
 path = "."
 uuid = "b45fdfc3-a2b6-4f47-8a4f-7c270f8f86ab"
 version = "0.1.0"
