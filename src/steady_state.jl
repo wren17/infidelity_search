@@ -57,23 +57,58 @@ function steady_state_distribution(sol, param)
     Nx = length(xg)
     dx = xg[2] - xg[1]
     VS = sol.VS
+    density = f_pdf(param)
 
-    # mass of matched pairs at state
-    n = zeros(param.T + 1, Nx)
+    # Precompute x_C(τ, x) for all states
+    x_cut_grid = zeros(param.T + 1, Nx)
+    for τ in 0:param.T, i in 1:Nx
+        VM_next = (τ < param.T) ? sol.VM[τ + 2, i] : sol.VM[τ + 1, i]
+        W = W_cont(VM_next, VS, param)
+        x_cut_grid[τ + 1, i] = find_x_cut(W, sol.VM0_vals, sol.xg, param)
+    end
 
-    # Inflow
+    # Singles inflow (constant across iterations)
     n_S_unnorm = 1.0
+    singles_inflow = zeros(Nx)
     for i in 1:Nx
         if xg[i] >= sol.x_star
-            n[1, i] = param.α * n_S_unnorm * f_pdf(param) * dx
+            singles_inflow[i] = param.α * n_S_unnorm * density * dx
         end
     end
 
-    # forward recursion
-    for τ in 0:(param.T - 1)
+    # Fixed-point iteration: cheater inflow at τ=0 depends on n
+    n = zeros(param.T + 1, Nx)
+    for iter in 1:500
+        n_old = copy(n)
+
+        # Inflow from cheaters forming new matches at τ=0
+        cheater_inflow = zeros(Nx)
         for i in 1:Nx
-            D = divorce_prob(τ, i, sol, param)
-            n[τ + 2, i] = (1.0 - D) * n[τ + 1, i]
+            mass = 0.0
+            for τ in 0:param.T, j in 1:Nx
+                s = sol.s_star_grid[τ + 1, j]
+                if s > 0 && xg[i] >= x_cut_grid[τ + 1, j]
+                    mass += s * n[τ + 1, j]
+                end
+            end
+            cheater_inflow[i] = param.α_prime * density * dx * mass
+        end
+
+        # Total inflow of relationship starting 
+        for i in 1:Nx
+            n[1, i] = singles_inflow[i] + cheater_inflow[i]
+        end
+
+        # Forward recursion
+        for τ in 0:(param.T - 1)
+            for i in 1:Nx
+                D = divorce_prob(τ, i, sol, param)
+                n[τ + 2, i] = (1.0 - D) * n[τ + 1, i]
+            end
+        end
+
+        if maximum(abs.(n .- n_old)) < 1e-6
+            break
         end
     end
 
