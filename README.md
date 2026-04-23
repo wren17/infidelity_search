@@ -28,6 +28,7 @@ Or, if you'd just like to see some of the model solution, it is also easy to get
 ```{julia}
 using Pkg
 Pkg.activate(".")
+#Pkg.instantiate()
 
 using MarriageModel
 
