@@ -1,15 +1,8 @@
----
-title: "A Dynamic Search Model for Marriage and Infidelity"
-author: Wuyang Ren
-bibliography: 622.bib
-link-citations: true
----
-
 # A Dynamic Search Model for Marriage and Infidelity
 
 *Wuyang Ren*
 
-The project extends Burdett, Imai, and Wright (2002) into a discrete-time bilateral strategic model where married agents choose each period whether to remain faithful or search for outside matches.
+The project extends Burdett, Imai, and Wright (2002) into a discrete-time bilateral strategic model where married agents choose each period whether to remain faithful or search for outside matches. The model also builds on Jovanovic (1979) by letting the flow utility of marriage grow over time, similar to "job-specific" human capital accumulation.
 
 As a course project, the goal is to practice implementations of search models, solving dynamic programming problems through backward induction, and simple Nash equilibrium analysis using computational tools. Some of the tools used here include fixed-point iteration, function approximation, and numerical integration. This framework be relevant for various topics of future research, especially in the field of labour economics.
 
@@ -22,7 +15,7 @@ A continuum of agents are either single or married. Single agents receive flow p
 ## Solution Algorithm
 
 1.  Discretize match values $x$ on a grid.
-2.  Starts with an initial guess for the value of beging single $V_S$ and the value of a new relationship with match value $V_m$ .
+2.  Starts with an initial guess for the value of beging single $V_S$ and the value of a new relationship with match value $V_m(0, x)$ .
 3.  Solve the cheating game for married couples in each state $(\tau, x)$ using backward induction from period $T$.
 4.  Use the solution from backward induction to update $V_S$ and $V_M(0, x)$
 
