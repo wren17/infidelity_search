@@ -4,7 +4,7 @@
 
 The project extends Burdett, Imai, and Wright (2002) into a discrete-time bilateral strategic model where married agents choose each period whether to remain faithful or search for outside matches. The model also builds on Jovanovic (1979) by letting the flow utility of marriage grow over time, similar to "job-specific" human capital accumulation.
 
-As a course project, the goal is to practice implementations of search models, solving dynamic programming problems through backward induction, and simple Nash equilibrium analysis using computational tools. Some of the tools used here include fixed-point iteration, function approximation, and numerical integration. This framework be relevant for various topics of future research, especially in the field of labour economics.
+As a course project, the goal is to practice implementations of search models, solving dynamic programming problems through backward induction, and simple Nash equilibrium analysis using computational tools. Some of the tools used here include fixed-point iteration, function approximation, and numerical integration. This framework may be relevant for various topics of future research, especially in the field of labour economics.
 
 The model is preliminary; feedbacks and suggestions are welcome.
 
